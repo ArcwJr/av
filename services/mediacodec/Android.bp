@@ -64,8 +64,5 @@ prebuilt_etc {
             src: "seccomp_policy/mediacodec-x86.policy",
         },
     },
-    required: [
-        "crash_dump.policy",
-        "code_coverage.policy",
-    ],
+    required: ["crash_dump.policy"],
 }

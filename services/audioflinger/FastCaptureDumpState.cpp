@@ -44,11 +44,10 @@ void FastCaptureDumpState::dump(int fd) const
     double periodSec = (double) mFrameCount / mSampleRate;
     dprintf(fd, "  FastCapture command=%s readSequence=%u framesRead=%u\n"
                 "              readErrors=%u sampleRate=%u frameCount=%zu\n"
-                "              measuredWarmup=%.3g ms, warmupCycles=%u period=%.2f ms\n"
-                "              silenced: %s\n",
+                "              measuredWarmup=%.3g ms, warmupCycles=%u period=%.2f ms\n",
                 FastCaptureState::commandToString(mCommand), mReadSequence, mFramesRead,
                 mReadErrors, mSampleRate, mFrameCount, measuredWarmupMs, mWarmupCycles,
-                periodSec * 1e3, mSilenced ? "true" : "false");
+                periodSec * 1e3);
 }
 
 }   // android

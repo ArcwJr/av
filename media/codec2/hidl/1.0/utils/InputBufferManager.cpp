@@ -70,7 +70,7 @@ void InputBufferManager::_registerFrameData(
                  << ".";
     std::lock_guard<std::mutex> lock(mMutex);
 
-    std::set<TrackedBuffer*> &bufferIds =
+    std::set<TrackedBuffer> &bufferIds =
             mTrackedBuffersMap[listener][frameIndex];
 
     for (size_t i = 0; i < input.buffers.size(); ++i) {
@@ -79,14 +79,13 @@ void InputBufferManager::_registerFrameData(
                          << "Input buffer at index " << i << " is null.";
             continue;
         }
-        TrackedBuffer *bufferId =
-            new TrackedBuffer(listener, frameIndex, i, input.buffers[i]);
-        mTrackedBufferCache.emplace(bufferId);
-        bufferIds.emplace(bufferId);
+        const TrackedBuffer &bufferId =
+                *bufferIds.emplace(listener, frameIndex, i, input.buffers[i]).
+                first;
 
         c2_status_t status = input.buffers[i]->registerOnDestroyNotify(
                 onBufferDestroyed,
-                reinterpret_cast<void*>(bufferId));
+                const_cast<void*>(reinterpret_cast<const void*>(&bufferId)));
         if (status != C2_OK) {
             LOG(DEBUG) << "InputBufferManager::_registerFrameData -- "
                        << "registerOnDestroyNotify() failed "
@@ -120,32 +119,31 @@ void InputBufferManager::_unregisterFrameData(
 
     auto findListener = mTrackedBuffersMap.find(listener);
     if (findListener != mTrackedBuffersMap.end()) {
-        std::map<uint64_t, std::set<TrackedBuffer*>> &frameIndex2BufferIds
+        std::map<uint64_t, std::set<TrackedBuffer>> &frameIndex2BufferIds
                 = findListener->second;
         auto findFrameIndex = frameIndex2BufferIds.find(frameIndex);
         if (findFrameIndex != frameIndex2BufferIds.end()) {
-            std::set<TrackedBuffer*> &bufferIds = findFrameIndex->second;
-            for (TrackedBuffer* bufferId : bufferIds) {
-                std::shared_ptr<C2Buffer> buffer = bufferId->buffer.lock();
+            std::set<TrackedBuffer> &bufferIds = findFrameIndex->second;
+            for (const TrackedBuffer& bufferId : bufferIds) {
+                std::shared_ptr<C2Buffer> buffer = bufferId.buffer.lock();
                 if (buffer) {
                     c2_status_t status = buffer->unregisterOnDestroyNotify(
                             onBufferDestroyed,
-                            reinterpret_cast<void*>(bufferId));
+                            const_cast<void*>(
+                            reinterpret_cast<const void*>(&bufferId)));
                     if (status != C2_OK) {
                         LOG(DEBUG) << "InputBufferManager::_unregisterFrameData "
                                    << "-- unregisterOnDestroyNotify() failed "
                                    << "(listener @ 0x"
                                         << std::hex
-                                        << bufferId->listener.unsafe_get()
+                                        << bufferId.listener.unsafe_get()
                                    << ", frameIndex = "
-                                        << std::dec << bufferId->frameIndex
-                                   << ", bufferIndex = " << bufferId->bufferIndex
+                                        << std::dec << bufferId.frameIndex
+                                   << ", bufferIndex = " << bufferId.bufferIndex
                                    << ") => status = " << status
                                    << ".";
                     }
                 }
-                mTrackedBufferCache.erase(bufferId);
-                delete bufferId;
             }
 
             frameIndex2BufferIds.erase(findFrameIndex);
@@ -181,32 +179,31 @@ void InputBufferManager::_unregisterFrameData(
 
     auto findListener = mTrackedBuffersMap.find(listener);
     if (findListener != mTrackedBuffersMap.end()) {
-        std::map<uint64_t, std::set<TrackedBuffer*>> &frameIndex2BufferIds =
+        std::map<uint64_t, std::set<TrackedBuffer>> &frameIndex2BufferIds =
                 findListener->second;
         for (auto findFrameIndex = frameIndex2BufferIds.begin();
                 findFrameIndex != frameIndex2BufferIds.end();
                 ++findFrameIndex) {
-            std::set<TrackedBuffer*> &bufferIds = findFrameIndex->second;
-            for (TrackedBuffer* bufferId : bufferIds) {
-                std::shared_ptr<C2Buffer> buffer = bufferId->buffer.lock();
+            std::set<TrackedBuffer> &bufferIds = findFrameIndex->second;
+            for (const TrackedBuffer& bufferId : bufferIds) {
+                std::shared_ptr<C2Buffer> buffer = bufferId.buffer.lock();
                 if (buffer) {
                     c2_status_t status = buffer->unregisterOnDestroyNotify(
                             onBufferDestroyed,
-                            reinterpret_cast<void*>(bufferId));
+                            const_cast<void*>(
+                            reinterpret_cast<const void*>(&bufferId)));
                     if (status != C2_OK) {
                         LOG(DEBUG) << "InputBufferManager::_unregisterFrameData "
                                    << "-- unregisterOnDestroyNotify() failed "
                                    << "(listener @ 0x"
                                         << std::hex
-                                        << bufferId->listener.unsafe_get()
+                                        << bufferId.listener.unsafe_get()
                                    << ", frameIndex = "
-                                        << std::dec << bufferId->frameIndex
-                                   << ", bufferIndex = " << bufferId->bufferIndex
+                                        << std::dec << bufferId.frameIndex
+                                   << ", bufferIndex = " << bufferId.bufferIndex
                                    << ") => status = " << status
                                    << ".";
                     }
-                    mTrackedBufferCache.erase(bufferId);
-                    delete bufferId;
                 }
             }
         }
@@ -239,59 +236,50 @@ void InputBufferManager::_onBufferDestroyed(const C2Buffer* buf, void* arg) {
                      << std::dec << ".";
         return;
     }
-
-    std::lock_guard<std::mutex> lock(mMutex);
-    TrackedBuffer *bufferId = reinterpret_cast<TrackedBuffer*>(arg);
-
-    if (mTrackedBufferCache.find(bufferId) == mTrackedBufferCache.end()) {
-        LOG(VERBOSE) << "InputBufferManager::_onBufferDestroyed -- called with "
-                     << "unregistered buffer: "
-                     << "buf @ 0x" << std::hex << buf
-                     << ", arg @ 0x" << std::hex << arg
-                     << std::dec << ".";
-        return;
-    }
-
+    TrackedBuffer id(*reinterpret_cast<TrackedBuffer*>(arg));
     LOG(VERBOSE) << "InputBufferManager::_onBufferDestroyed -- called with "
                  << "buf @ 0x" << std::hex << buf
                  << ", arg @ 0x" << std::hex << arg
                  << std::dec << " -- "
-                 << "listener @ 0x" << std::hex << bufferId->listener.unsafe_get()
-                 << ", frameIndex = " << std::dec << bufferId->frameIndex
-                 << ", bufferIndex = " << bufferId->bufferIndex
+                 << "listener @ 0x" << std::hex << id.listener.unsafe_get()
+                 << ", frameIndex = " << std::dec << id.frameIndex
+                 << ", bufferIndex = " << id.bufferIndex
                  << ".";
-    auto findListener = mTrackedBuffersMap.find(bufferId->listener);
-    if (findListener == mTrackedBuffersMap.end()) {
-        LOG(VERBOSE) << "InputBufferManager::_onBufferDestroyed -- "
-                     << "received invalid listener: "
-                     << "listener @ 0x" << std::hex << bufferId->listener.unsafe_get()
-                     << " (frameIndex = " << std::dec << bufferId->frameIndex
-                     << ", bufferIndex = " << bufferId->bufferIndex
-                     << ").";
-        return;
-    }
 
-    std::map<uint64_t, std::set<TrackedBuffer*>> &frameIndex2BufferIds
-            = findListener->second;
-    auto findFrameIndex = frameIndex2BufferIds.find(bufferId->frameIndex);
-    if (findFrameIndex == frameIndex2BufferIds.end()) {
+    std::lock_guard<std::mutex> lock(mMutex);
+
+    auto findListener = mTrackedBuffersMap.find(id.listener);
+    if (findListener == mTrackedBuffersMap.end()) {
         LOG(DEBUG) << "InputBufferManager::_onBufferDestroyed -- "
-                   << "received invalid frame index: "
-                   << "frameIndex = " << bufferId->frameIndex
-                   << " (listener @ 0x" << std::hex << bufferId->listener.unsafe_get()
-                   << ", bufferIndex = " << std::dec << bufferId->bufferIndex
+                   << "received invalid listener: "
+                   << "listener @ 0x" << std::hex << id.listener.unsafe_get()
+                   << " (frameIndex = " << std::dec << id.frameIndex
+                   << ", bufferIndex = " << id.bufferIndex
                    << ").";
         return;
     }
 
-    std::set<TrackedBuffer*> &bufferIds = findFrameIndex->second;
-    auto findBufferId = bufferIds.find(bufferId);
+    std::map<uint64_t, std::set<TrackedBuffer>> &frameIndex2BufferIds
+            = findListener->second;
+    auto findFrameIndex = frameIndex2BufferIds.find(id.frameIndex);
+    if (findFrameIndex == frameIndex2BufferIds.end()) {
+        LOG(DEBUG) << "InputBufferManager::_onBufferDestroyed -- "
+                   << "received invalid frame index: "
+                   << "frameIndex = " << id.frameIndex
+                   << " (listener @ 0x" << std::hex << id.listener.unsafe_get()
+                   << ", bufferIndex = " << std::dec << id.bufferIndex
+                   << ").";
+        return;
+    }
+
+    std::set<TrackedBuffer> &bufferIds = findFrameIndex->second;
+    auto findBufferId = bufferIds.find(id);
     if (findBufferId == bufferIds.end()) {
         LOG(DEBUG) << "InputBufferManager::_onBufferDestroyed -- "
                    << "received invalid buffer index: "
-                   << "bufferIndex = " << bufferId->bufferIndex
-                   << " (frameIndex = " << bufferId->frameIndex
-                   << ", listener @ 0x" << std::hex << bufferId->listener.unsafe_get()
+                   << "bufferIndex = " << id.bufferIndex
+                   << " (frameIndex = " << id.frameIndex
+                   << ", listener @ 0x" << std::hex << id.listener.unsafe_get()
                    << std::dec << ").";
         return;
     }
@@ -304,13 +292,10 @@ void InputBufferManager::_onBufferDestroyed(const C2Buffer* buf, void* arg) {
         }
     }
 
-    DeathNotifications &deathNotifications = mDeathNotifications[bufferId->listener];
-    deathNotifications.indices[bufferId->frameIndex].emplace_back(bufferId->bufferIndex);
+    DeathNotifications &deathNotifications = mDeathNotifications[id.listener];
+    deathNotifications.indices[id.frameIndex].emplace_back(id.bufferIndex);
     ++deathNotifications.count;
     mOnBufferDestroyed.notify_one();
-
-    mTrackedBufferCache.erase(bufferId);
-    delete bufferId;
 }
 
 // Notify the clients about buffer destructions.

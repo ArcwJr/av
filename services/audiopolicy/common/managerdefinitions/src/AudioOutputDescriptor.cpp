@@ -36,7 +36,7 @@ namespace android {
 
 AudioOutputDescriptor::AudioOutputDescriptor(const sp<AudioPort>& port,
                                              AudioPolicyClientInterface *clientInterface)
-    : mIoHandle(AUDIO_IO_HANDLE_NONE), mPort(port), mClientInterface(clientInterface)
+    : mPort(port), mClientInterface(clientInterface)
 {
     if (mPort.get() != nullptr) {
         mPort->pickAudioProfile(mSamplingRate, mChannelMask, mFormat);
@@ -121,12 +121,6 @@ void AudioOutputDescriptor::setClientActive(const sp<TrackClientDescriptor>& cli
         }
     }
     client->setActive(active);
-}
-
-bool AudioOutputDescriptor::isClientActive(const sp<TrackClientDescriptor>& client)
-{
-    auto clientIter = std::find(begin(mActiveClients), end(mActiveClients), client);
-    return (clientIter != end(mActiveClients));
 }
 
 bool AudioOutputDescriptor::isActive(VolumeSource vs, uint32_t inPastMs, nsecs_t sysTime) const
@@ -260,7 +254,7 @@ void AudioOutputDescriptor::log(const char* indent)
 SwAudioOutputDescriptor::SwAudioOutputDescriptor(const sp<IOProfile>& profile,
                                                  AudioPolicyClientInterface *clientInterface)
     : AudioOutputDescriptor(profile, clientInterface),
-    mProfile(profile), mLatency(0),
+    mProfile(profile), mIoHandle(AUDIO_IO_HANDLE_NONE), mLatency(0),
     mFlags((audio_output_flags_t)0),
     mOutput1(0), mOutput2(0), mDirectOpenCount(0),
     mDirectClientSession(AUDIO_SESSION_NONE)

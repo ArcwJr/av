@@ -409,9 +409,7 @@ decode_vol:
         if (!BitstreamRead1Bits(stream)) return PV_FAIL;
 
         /* video_object_layer_width (13 bits) */
-        tmpvar = BitstreamReadBits16(stream, 13);
-        if (!tmpvar) return PV_FAIL;
-        video->displayWidth = video->width = tmpvar;
+        video->displayWidth = video->width = (int) BitstreamReadBits16(stream, 13);
 
         /* round up to a multiple of MB_SIZE.   08/09/2000 */
         video->width = (video->width + 15) & -16;
@@ -421,9 +419,7 @@ decode_vol:
         if (!BitstreamRead1Bits(stream)) return PV_FAIL;
 
         /* video_object_layer_height (13 bits) */
-        tmpvar = BitstreamReadBits16(stream, 13);
-        if (!tmpvar) return PV_FAIL;
-        video->displayHeight = video->height = tmpvar;
+        video->displayHeight = video->height = (int) BitstreamReadBits16(stream, 13);
 
         /* round up to a multiple of MB_SIZE.   08/09/2000 */
         video->height = (video->height + 15) & -16;

@@ -35,7 +35,6 @@ struct FastCaptureDumpState : FastThreadDumpState {
     uint32_t mReadErrors;       // total number of read() errors
     uint32_t mSampleRate;
     size_t   mFrameCount;
-    bool     mSilenced = false; // capture is silenced
 };
 
 }   // android

@@ -132,7 +132,6 @@ static size_t getAdtsFrameLength(DataSourceHelper *source, off64_t offset, size_
 AACExtractor::AACExtractor(
         DataSourceHelper *source, off64_t offset)
     : mDataSource(source),
-      mMeta(nullptr),
       mInitCheck(NO_INIT),
       mFrameDurationUs(0) {
 
@@ -181,9 +180,7 @@ AACExtractor::AACExtractor(
 }
 
 AACExtractor::~AACExtractor() {
-    if (mMeta != nullptr) {
-        AMediaFormat_delete(mMeta);
-    }
+    AMediaFormat_delete(mMeta);
 }
 
 media_status_t AACExtractor::getMetaData(AMediaFormat *meta) {

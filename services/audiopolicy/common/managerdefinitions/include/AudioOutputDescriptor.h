@@ -180,7 +180,6 @@ public:
      * Active ref count of the client will be incremented/decremented through setActive API
      */
     virtual void setClientActive(const sp<TrackClientDescriptor>& client, bool active);
-    bool isClientActive(const sp<TrackClientDescriptor>& client);
 
     bool isActive(uint32_t inPastMs) const;
     bool isActive(VolumeSource volumeSource = VOLUME_SOURCE_NONE,
@@ -288,7 +287,6 @@ public:
 
     DeviceVector mDevices; /**< current devices this output is routed to */
     wp<AudioPolicyMix> mPolicyMix;  // non NULL when used by a dynamic policy
-    audio_io_handle_t mIoHandle;           // output handle
 
 protected:
     const sp<AudioPort> mPort;
@@ -389,6 +387,7 @@ public:
     DeviceVector filterSupportedDevices(const DeviceVector &devices) const;
 
     const sp<IOProfile> mProfile;          // I/O profile this output derives from
+    audio_io_handle_t mIoHandle;           // output handle
     uint32_t mLatency;                  //
     audio_output_flags_t mFlags;   //
     sp<SwAudioOutputDescriptor> mOutput1;    // used by duplicated outputs: first output

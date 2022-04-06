@@ -62,7 +62,7 @@ public:
             android::base::unique_fd &&fd0,
             android::base::unique_fd &&fd1) {
         Mutexed<Jobs>::Locked jobs(mJobs);
-        auto it = jobs->queues.try_emplace(comp, comp).first;
+        auto it = jobs->queues.try_emplace(comp, comp, systemTime()).first;
         it->second.workList.emplace_back(
                 std::move(work), fenceFd, std::move(fd0), std::move(fd1));
         jobs->cond.broadcast();
@@ -79,8 +79,7 @@ protected:
             for (auto it = jobs->queues.begin(); it != jobs->queues.end(); ) {
                 Queue &queue = it->second;
                 if (queue.workList.empty()
-                        || (queue.lastQueuedTimestampNs != 0 &&
-                            nowNs - queue.lastQueuedTimestampNs < kIntervalNs)) {
+                        || nowNs - queue.lastQueuedTimestampNs < kIntervalNs) {
                     ++it;
                     continue;
                 }
@@ -105,7 +104,6 @@ protected:
                     sp<Fence> fence(new Fence(fenceFd));
                     fence->waitForever(LOG_TAG);
                 }
-                queue.lastQueuedTimestampNs = nowNs;
                 comp->queue(&items);
                 for (android::base::unique_fd &ufd : uniqueFds) {
                     (void)ufd.release();
@@ -145,8 +143,8 @@ private:
         android::base::unique_fd fd1;
     };
     struct Queue {
-        Queue(const std::shared_ptr<Codec2Client::Component> &comp)
-            : component(comp), lastQueuedTimestampNs(0) {}
+        Queue(const std::shared_ptr<Codec2Client::Component> &comp, nsecs_t timestamp)
+            : component(comp), lastQueuedTimestampNs(timestamp) {}
         Queue(const Queue &) = delete;
         Queue &operator =(const Queue &) = delete;
 

@@ -67,7 +67,6 @@
 #include <media/nbaio/PipeReader.h>
 #include <mediautils/BatteryNotifier.h>
 #include <mediautils/ServiceUtilities.h>
-#include <mediautils/TimeCheck.h>
 #include <private/android_filesystem_config.h>
 
 //#define BUFLOG_NDEBUG 0
@@ -119,7 +118,7 @@ static pthread_once_t sMediaLogOnce = PTHREAD_ONCE_INIT;
 
 static void sMediaLogInit()
 {
-    sMediaLogServiceAsBinder = defaultServiceManager()->getService(String16("media.log"));
+    sMediaLogServiceAsBinder = initdefaultServiceManager()->getService(String16("media.log"));
     if (sMediaLogServiceAsBinder != 0) {
         sMediaLogService = interface_cast<IMediaLogService>(sMediaLogServiceAsBinder);
     }
@@ -191,9 +190,6 @@ AudioFlinger::AudioFlinger()
     mEffectsFactoryHal = EffectsFactoryHalInterface::create();
 
     mMediaLogNotifier->run("MediaLogNotifier");
-    std::vector<pid_t> halPids;
-    mDevicesFactoryHal->getHalPids(&halPids);
-    TimeCheck::setAudioHalPids(halPids);
 }
 
 void AudioFlinger::onFirstRef()
@@ -217,11 +213,6 @@ void AudioFlinger::onFirstRef()
     mMode = AUDIO_MODE_NORMAL;
 
     gAudioFlinger = this;
-}
-
-status_t AudioFlinger::setAudioHalPids(const std::vector<pid_t>& pids) {
-  TimeCheck::setAudioHalPids(pids);
-  return NO_ERROR;
 }
 
 AudioFlinger::~AudioFlinger()
